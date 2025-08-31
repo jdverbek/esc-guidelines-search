@@ -147,12 +147,20 @@ def main():
         
         # Verify processed data
         chunks_file = processed_dir / "chunks.json"
+        metadata_file = processed_dir / "metadata.json"
+        
         if chunks_file.exists():
             with open(chunks_file, 'r') as f:
-                data = json.load(f)
-                chunk_count = len(data.get('chunks', []))
-                doc_count = len(data.get('metadata', {}))
-                logger.info(f"📊 Processed {chunk_count} chunks from {doc_count} documents")
+                chunks_data = json.load(f)
+                chunk_count = len(chunks_data) if isinstance(chunks_data, list) else len(chunks_data.get('chunks', []))
+                
+            doc_count = 0
+            if metadata_file.exists():
+                with open(metadata_file, 'r') as f:
+                    metadata = json.load(f)
+                    doc_count = len(metadata) if isinstance(metadata, dict) else 0
+                    
+            logger.info(f"📊 Processed {chunk_count} chunks from {doc_count} documents")
         
         return True
     else:
