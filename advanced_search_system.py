@@ -29,12 +29,18 @@ class AdvancedESCSearch:
         self.index_file = os.path.join(processed_dir, "faiss_index.bin")
         self.metadata_file = os.path.join(processed_dir, "metadata.json")
         
-        # Load embedding model
-        logger.info("Loading embedding model...")
-        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        # Initialize model as None - will be loaded lazily
+        self.embedding_model = None
+        self.model_load_attempted = False
+        self.model_load_error = None
         
         # Load processed data
-        self.load_data()
+        try:
+            self.load_data()
+            logger.info("✅ Data loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load data: {e}")
+            raise
         
         # Medical synonyms for query expansion
         self.medical_synonyms = {
@@ -67,6 +73,60 @@ class AdvancedESCSearch:
         
         logger.info(f"Loaded {len(self.chunks)} chunks and index with {self.index.ntotal} vectors")
     
+    def _load_embedding_model(self):
+        """Lazy loading of embedding model with error handling"""
+        if self.model_load_attempted:
+            return self.embedding_model is not None
+        
+        self.model_load_attempted = True
+        try:
+            logger.info("🤖 Loading embedding model (this may take a moment)...")
+            from sentence_transformers import SentenceTransformer
+            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("✅ Embedding model loaded successfully")
+            return True
+        except Exception as e:
+            self.model_load_error = str(e)
+            logger.error(f"❌ Failed to load embedding model: {e}")
+            logger.warning("🔄 Search will use fallback text matching instead of semantic search")
+            return False
+    
+    def _fallback_search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """Fallback text-based search when embedding model fails"""
+        logger.info("Using fallback text-based search")
+        
+        query_lower = query.lower()
+        scored_chunks = []
+        
+        for i, chunk in enumerate(self.chunks):
+            text_lower = chunk['text'].lower()
+            
+            # Simple scoring based on term frequency and position
+            score = 0
+            query_terms = query_lower.split()
+            
+            for term in query_terms:
+                # Count occurrences
+                count = text_lower.count(term)
+                if count > 0:
+                    score += count * 10
+                    
+                    # Bonus for term appearing early in text
+                    first_pos = text_lower.find(term)
+                    if first_pos < 100:  # First 100 characters
+                        score += 5
+            
+            if score > 0:
+                scored_chunks.append({
+                    'chunk_index': i,
+                    'score': score,
+                    'chunk': chunk
+                })
+        
+        # Sort by score and return top results
+        scored_chunks.sort(key=lambda x: x['score'], reverse=True)
+        return scored_chunks[:top_k]
+    
     def expand_query(self, query: str) -> str:
         """
         Expand query with medical synonyms and related terms
@@ -97,6 +157,29 @@ class AdvancedESCSearch:
         """
         Enhanced search with query expansion and filtering
         """
+        # Try to load embedding model if not already loaded
+        if not self._load_embedding_model():
+            # Use fallback search if model loading failed
+            logger.info("Using fallback text-based search due to model loading failure")
+            fallback_results = self._fallback_search(query, top_k)
+            
+            results = []
+            for result in fallback_results:
+                chunk = result['chunk'].copy()
+                
+                # Apply guideline filter if specified
+                if filter_guideline and filter_guideline.lower() not in chunk['document_name'].lower():
+                    continue
+                
+                # Add search metadata
+                chunk['search_score'] = result['score'] / 100.0  # Normalize score
+                chunk['search_method'] = 'text_fallback'
+                chunk['model_error'] = self.model_load_error
+                
+                results.append(chunk)
+            
+            return results[:top_k]
+        
         # Expand query if requested
         if expand_query:
             search_query = self.expand_query(query)
@@ -104,10 +187,20 @@ class AdvancedESCSearch:
             search_query = query
         
         # Generate query embedding
-        query_embedding = self.embedding_model.encode([search_query])
+        try:
+            query_embedding = self.embedding_model.encode([search_query])
+        except Exception as e:
+            logger.error(f"❌ Error generating query embedding: {e}")
+            # Fall back to text search
+            return self._fallback_search(query, top_k)
         
         # Search in FAISS index
-        scores, indices = self.index.search(query_embedding.astype('float32'), min(top_k * 3, len(self.chunks)))
+        try:
+            scores, indices = self.index.search(query_embedding.astype('float32'), min(top_k * 3, len(self.chunks)))
+        except Exception as e:
+            logger.error(f"❌ Error searching FAISS index: {e}")
+            # Fall back to text search
+            return self._fallback_search(query, top_k)
         
         results = []
         for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
@@ -181,6 +274,11 @@ class AdvancedESCSearch:
         """
         Find chunks similar to a given chunk
         """
+        # Try to load embedding model if not already loaded
+        if not self._load_embedding_model():
+            logger.warning("Cannot find similar chunks without embedding model")
+            return []
+        
         # Find the chunk
         target_chunk = None
         target_idx = None
@@ -194,21 +292,26 @@ class AdvancedESCSearch:
         if not target_chunk:
             return []
         
-        # Get embedding for this chunk
-        chunk_embedding = self.embedding_model.encode([target_chunk['text']])
+        try:
+            # Get embedding for this chunk
+            chunk_embedding = self.embedding_model.encode([target_chunk['text']])
+            
+            # Search for similar chunks
+            scores, indices = self.index.search(chunk_embedding.astype('float32'), top_k + 1)
+            
+            results = []
+            for score, idx in zip(scores[0], indices[0]):
+                if idx != target_idx and idx < len(self.chunks):  # Exclude the original chunk
+                    chunk = self.chunks[idx].copy()
+                    chunk['similarity_score'] = float(score)
+                    chunk['relevance_score'] = max(0, 1 - score)
+                    results.append(chunk)
+            
+            return results[:top_k]
         
-        # Search for similar chunks
-        scores, indices = self.index.search(chunk_embedding.astype('float32'), top_k + 1)
-        
-        results = []
-        for score, idx in zip(scores[0], indices[0]):
-            if idx != target_idx and idx < len(self.chunks):  # Exclude the original chunk
-                chunk = self.chunks[idx].copy()
-                chunk['similarity_score'] = float(score)
-                chunk['relevance_score'] = max(0, 1 - score)
-                results.append(chunk)
-        
-        return results[:top_k]
+        except Exception as e:
+            logger.error(f"❌ Error finding similar chunks: {e}")
+            return []
     
     def format_search_results(self, results: List[Dict], query: str) -> str:
         """
