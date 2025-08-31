@@ -55,7 +55,6 @@ logs/
 .env.production.local
 
 # Large data files (download separately)
-ESC_Guidelines/*.pdf
 processed_guidelines/chunks.json
 processed_guidelines/metadata.json
 processed_guidelines/faiss_index.bin
