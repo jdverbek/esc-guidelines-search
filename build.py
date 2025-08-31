@@ -94,35 +94,46 @@ def main():
     guidelines_dir.mkdir(exist_ok=True)
     processed_dir.mkdir(exist_ok=True)
     
-    # Download ESC Guidelines
-    logger.info("📥 Downloading ESC Guidelines...")
-    downloaded_count = 0
-    
-    for filename, url in ESC_GUIDELINES_URLS.items():
-        filepath = guidelines_dir / filename
-        
-        if not filepath.exists():
-            if download_file(url, filepath):
-                downloaded_count += 1
-            else:
-                logger.warning(f"⚠️ Failed to download {filename}, continuing with others...")
-        else:
-            logger.info(f"📄 {filename} already exists, skipping download")
-            downloaded_count += 1
-    
-    logger.info(f"📊 Downloaded {downloaded_count}/{len(ESC_GUIDELINES_URLS)} guidelines")
-    
-    if downloaded_count == 0:
-        logger.error("❌ No guidelines were downloaded successfully")
-        return False
-    
-    # Check if we have any PDF files
+    # Check if we already have ESC Guidelines files
     pdf_files = list(guidelines_dir.glob("*.pdf"))
+    
+    if pdf_files:
+        logger.info(f"📚 Found {len(pdf_files)} existing ESC Guidelines PDFs")
+        for pdf_file in pdf_files:
+            logger.info(f"   - {pdf_file.name} ({pdf_file.stat().st_size / 1024 / 1024:.1f} MB)")
+    else:
+        logger.info("📥 No existing PDFs found, attempting to download...")
+        
+        # Download ESC Guidelines (this will likely fail due to 403 errors)
+        downloaded_count = 0
+        
+        for filename, url in ESC_GUIDELINES_URLS.items():
+            filepath = guidelines_dir / filename
+            
+            if not filepath.exists():
+                if download_file(url, filepath):
+                    downloaded_count += 1
+                else:
+                    logger.warning(f"⚠️ Failed to download {filename}, continuing with others...")
+            else:
+                logger.info(f"📄 {filename} already exists, skipping download")
+                downloaded_count += 1
+        
+        logger.info(f"📊 Downloaded {downloaded_count}/{len(ESC_GUIDELINES_URLS)} guidelines")
+        
+        if downloaded_count == 0:
+            logger.error("❌ No guidelines were downloaded successfully")
+            logger.error("💡 Please provide ESC Guidelines PDFs manually in the ESC_Guidelines directory")
+            return False
+        
+        # Re-check for PDF files after download attempt
+        pdf_files = list(guidelines_dir.glob("*.pdf"))
+    
     if not pdf_files:
-        logger.error("❌ No PDF files found after download")
+        logger.error("❌ No PDF files found after download attempt")
         return False
     
-    logger.info(f"📚 Found {len(pdf_files)} PDF files to process")
+    logger.info(f"📚 Processing {len(pdf_files)} PDF files...")
     
     # Process the guidelines
     logger.info("🔄 Processing ESC Guidelines...")
