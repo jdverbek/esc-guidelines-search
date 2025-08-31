@@ -7,6 +7,7 @@ import os
 import sys
 import json
 import logging
+from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 
@@ -264,15 +265,62 @@ def initialize_search_system():
     """Initialize the search system if data is available"""
     global search_system
     try:
-        # Check if processed data exists
-        if os.path.exists('processed_guidelines/chunks.json'):
-            from advanced_search_system import AdvancedESCSearch
-            search_system = AdvancedESCSearch()
-            logger.info("Search system initialized successfully")
+        logger.info("🔄 Starting search system initialization...")
+        
+        # Check current working directory
+        cwd = os.getcwd()
+        logger.info(f"📁 Current working directory: {cwd}")
+        
+        # List all files in current directory
+        files = os.listdir('.')
+        logger.info(f"📂 Files in current directory: {files}")
+        
+        # Check if processed_guidelines directory exists
+        processed_dir = 'processed_guidelines'
+        if os.path.exists(processed_dir):
+            logger.info(f"✅ Found {processed_dir} directory")
+            processed_files = os.listdir(processed_dir)
+            logger.info(f"📄 Files in {processed_dir}: {processed_files}")
         else:
-            logger.warning("Processed guidelines data not found. Please run setup first.")
+            logger.error(f"❌ {processed_dir} directory not found")
+            return False
+        
+        # Check specific required files
+        required_files = ['chunks.json', 'metadata.json', 'faiss_index.bin']
+        missing_files = []
+        
+        for file in required_files:
+            file_path = os.path.join(processed_dir, file)
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                logger.info(f"✅ Found {file}: {file_size} bytes")
+            else:
+                missing_files.append(file)
+                logger.error(f"❌ Missing {file}")
+        
+        if missing_files:
+            logger.error(f"❌ Cannot initialize search system. Missing files: {missing_files}")
+            return False
+        
+        # Try to initialize the search system
+        logger.info("🤖 Loading AdvancedESCSearch...")
+        from advanced_search_system import AdvancedESCSearch
+        
+        logger.info("🔧 Creating search system instance...")
+        search_system = AdvancedESCSearch()
+        
+        logger.info("✅ Search system initialized successfully!")
+        return True
+        
+    except ImportError as e:
+        logger.error(f"❌ Import error: {e}")
+        return False
     except Exception as e:
-        logger.error(f"Failed to initialize search system: {e}")
+        logger.error(f"❌ Failed to initialize search system: {e}")
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        return False
 
 @app.route('/')
 def index():
@@ -376,6 +424,75 @@ def health_check():
     except Exception as e:
         logger.error(f"Health check error: {e}")
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
+@app.route('/diagnostic', methods=['GET'])
+def diagnostic():
+    """Detailed diagnostic information for debugging"""
+    try:
+        import os
+        import sys
+        
+        diag_info = {
+            'timestamp': datetime.now().isoformat(),
+            'python_version': sys.version,
+            'working_directory': os.getcwd(),
+            'environment_variables': {
+                'PORT': os.environ.get('PORT', 'Not set'),
+                'RENDER': os.environ.get('RENDER', 'Not set'),
+            },
+            'search_system_status': 'initialized' if search_system else 'not_initialized',
+            'file_system': {}
+        }
+        
+        # Check file system
+        try:
+            diag_info['file_system']['current_dir_files'] = os.listdir('.')
+        except Exception as e:
+            diag_info['file_system']['current_dir_error'] = str(e)
+        
+        # Check processed_guidelines directory
+        processed_dir = 'processed_guidelines'
+        if os.path.exists(processed_dir):
+            try:
+                files = os.listdir(processed_dir)
+                diag_info['file_system']['processed_guidelines'] = {}
+                for file in files:
+                    file_path = os.path.join(processed_dir, file)
+                    if os.path.isfile(file_path):
+                        diag_info['file_system']['processed_guidelines'][file] = {
+                            'size': os.path.getsize(file_path),
+                            'exists': True
+                        }
+            except Exception as e:
+                diag_info['file_system']['processed_guidelines_error'] = str(e)
+        else:
+            diag_info['file_system']['processed_guidelines'] = 'directory_not_found'
+        
+        # Check ESC_Guidelines directory
+        esc_dir = 'ESC_Guidelines'
+        if os.path.exists(esc_dir):
+            try:
+                files = os.listdir(esc_dir)
+                diag_info['file_system']['esc_guidelines'] = {
+                    'file_count': len([f for f in files if f.endswith('.pdf')]),
+                    'total_files': len(files)
+                }
+            except Exception as e:
+                diag_info['file_system']['esc_guidelines_error'] = str(e)
+        else:
+            diag_info['file_system']['esc_guidelines'] = 'directory_not_found'
+        
+        # Try to reinitialize search system if it's not working
+        if not search_system:
+            diag_info['reinitialize_attempt'] = initialize_search_system()
+        
+        return jsonify(diag_info)
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'error_type': type(e).__name__
+        }), 500
 
 @app.route('/setup-status', methods=['GET'])
 def setup_status():
