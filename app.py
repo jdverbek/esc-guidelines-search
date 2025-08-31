@@ -75,11 +75,6 @@ HTML_TEMPLATE = """
             <p>Search through European Society of Cardiology Guidelines using AI-powered semantic search</p>
         </div>
         
-        <div class="setup-notice" id="setupNotice">
-            <h3>⚠️ Setup Required</h3>
-            <p>This deployment requires ESC Guidelines data to be processed. Please follow the setup instructions in the GitHub repository to download and process the guidelines.</p>
-        </div>
-        
         <div class="search-section">
             <form class="search-form" id="searchForm">
                 <input type="text" class="search-input" id="searchInput" placeholder="Enter your medical question or search term..." required>
@@ -127,7 +122,6 @@ HTML_TEMPLATE = """
         const searchBtn = document.getElementById('searchBtn');
         const resultsSection = document.getElementById('resultsSection');
         const resultsContent = document.getElementById('resultsContent');
-        const setupNotice = document.getElementById('setupNotice');
         
         function setQuery(query) {
             searchInput.value = query;
@@ -146,25 +140,8 @@ HTML_TEMPLATE = """
             searchBtn.textContent = 'Search';
         }
         
-        function showError(message, data = null) {
-            let errorHtml = `<div class="error">❌ ${message}</div>`;
-            
-            if (data && data.setup_required) {
-                errorHtml += `
-                    <div class="setup-notice" style="margin-top: 1rem;">
-                        <h3>🔧 Setup Required</h3>
-                        <p><strong>This is a deployment template.</strong> To enable full search functionality:</p>
-                        <ol style="margin: 1rem 0; padding-left: 2rem;">
-                            <li>Download ESC Guidelines PDFs from the official ESC website</li>
-                            <li>Process the data using the provided scripts in the repository</li>
-                            <li>Or visit a fully configured demo instance</li>
-                        </ol>
-                        <p><strong>Repository:</strong> <a href="https://github.com/jdverbek/esc-guidelines-search" target="_blank">https://github.com/jdverbek/esc-guidelines-search</a></p>
-                    </div>
-                `;
-            }
-            
-            resultsContent.innerHTML = errorHtml;
+        function showError(message) {
+            resultsContent.innerHTML = `<div class="error">❌ Error: ${message}</div>`;
             hideLoading();
         }
         
@@ -234,8 +211,7 @@ HTML_TEMPLATE = """
                 const data = await response.json();
                 
                 if (data.error) {
-                    showError(data.error, data);
-                    return;
+                    throw new Error(data.error);
                 }
                 
                 resultsContent.innerHTML = formatResults(data);
@@ -269,9 +245,6 @@ HTML_TEMPLATE = """
                 if (response.ok) {
                     const data = await response.json();
                     console.log('API Health Check:', data);
-                    if (data.status === 'healthy') {
-                        setupNotice.style.display = 'none';
-                    }
                 } else {
                     console.warn('API health check failed');
                 }
@@ -311,16 +284,9 @@ def search():
     """Main search endpoint"""
     if not search_system:
         return jsonify({
-            'error': 'ESC Guidelines data not available. This deployment requires manual setup of the medical guidelines data.',
-            'setup_required': True,
-            'instructions': [
-                '1. Download ESC Guidelines PDFs from https://www.escardio.org/Guidelines/Clinical-Practice-Guidelines',
-                '2. Process the data using the provided scripts',
-                '3. For a fully functional demo, visit the original deployment'
-            ],
-            'demo_available': True,
-            'demo_message': 'This is a deployment template. The search functionality requires ESC Guidelines data to be processed.'
-        }), 200  # Changed to 200 to avoid browser errors
+            'error': 'Search system is initializing. Please try again in a moment.',
+            'retry': True
+        }), 503
     
     try:
         data = request.get_json()
@@ -347,16 +313,9 @@ def clinical_search():
     """Clinical question search endpoint"""
     if not search_system:
         return jsonify({
-            'error': 'ESC Guidelines data not available. This deployment requires manual setup of the medical guidelines data.',
-            'setup_required': True,
-            'instructions': [
-                '1. Download ESC Guidelines PDFs from https://www.escardio.org/Guidelines/Clinical-Practice-Guidelines',
-                '2. Process the data using the provided scripts',
-                '3. For a fully functional demo, visit the original deployment'
-            ],
-            'demo_available': True,
-            'demo_message': 'This is a deployment template. The clinical search functionality requires ESC Guidelines data to be processed.'
-        }), 200  # Changed to 200 to avoid browser errors
+            'error': 'Search system is initializing. Please try again in a moment.',
+            'retry': True
+        }), 503
     
     try:
         data = request.get_json()

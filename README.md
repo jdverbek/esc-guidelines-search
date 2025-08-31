@@ -1,8 +1,8 @@
-# ESC Guidelines AI Search Tool - Render Deployment
+# ESC Guidelines AI Search Tool - Fully Functional Render Deployment
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
-An AI-powered search tool for navigating European Society of Cardiology (ESC) Guidelines using semantic search and natural language processing.
+A **fully functional** AI-powered search tool for navigating European Society of Cardiology (ESC) Guidelines. This deployment automatically downloads and processes the latest ESC Guidelines during build time, so it's ready to use immediately after deployment.
 
 ## 🌟 Features
 
@@ -12,6 +12,7 @@ An AI-powered search tool for navigating European Society of Cardiology (ESC) Gu
 - **⚡ Fast Results**: Sub-second search with FAISS vector indexing
 - **📱 Responsive Design**: Works on desktop and mobile devices
 - **🔗 RESTful API**: Programmatic access for integration
+- **🚀 Zero Setup**: Fully functional immediately after deployment
 
 ## 🚀 One-Click Deployment to Render
 
@@ -20,8 +21,11 @@ An AI-powered search tool for navigating European Society of Cardiology (ESC) Gu
 1. **Click the "Deploy to Render" button above**
 2. **Connect your GitHub account** if not already connected
 3. **Fork this repository** or create a new one
-4. **Configure the service** in Render dashboard
+4. **Configure the service** in Render dashboard:
+   - **Plan**: Standard ($7/month) - Required for processing
+   - **Build time**: 15-20 minutes (downloads and processes guidelines)
 5. **Wait for deployment** to complete
+6. **Start searching** immediately!
 
 ### Manual Deployment
 
