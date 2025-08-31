@@ -25,8 +25,8 @@ class ESCGuidelinesProcessor:
     Main class for processing ESC Guidelines PDFs and building searchable index
     """
     
-    def __init__(self, guidelines_dir: str = "/home/ubuntu/ESC_Guidelines", 
-                 output_dir: str = "/home/ubuntu/processed_guidelines"):
+    def __init__(self, guidelines_dir: str = "ESC_Guidelines", 
+                 output_dir: str = "processed_guidelines"):
         self.guidelines_dir = guidelines_dir
         self.output_dir = output_dir
         self.chunks_file = os.path.join(output_dir, "chunks.json")

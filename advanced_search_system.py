@@ -23,7 +23,7 @@ class AdvancedESCSearch:
     Advanced search system for ESC Guidelines with enhanced query processing
     """
     
-    def __init__(self, processed_dir: str = "/home/ubuntu/processed_guidelines"):
+    def __init__(self, processed_dir: str = "processed_guidelines"):
         self.processed_dir = processed_dir
         self.chunks_file = os.path.join(processed_dir, "chunks.json")
         self.index_file = os.path.join(processed_dir, "faiss_index.bin")
