@@ -146,8 +146,25 @@ HTML_TEMPLATE = """
             searchBtn.textContent = 'Search';
         }
         
-        function showError(message) {
-            resultsContent.innerHTML = `<div class="error">❌ Error: ${message}</div>`;
+        function showError(message, data = null) {
+            let errorHtml = `<div class="error">❌ ${message}</div>`;
+            
+            if (data && data.setup_required) {
+                errorHtml += `
+                    <div class="setup-notice" style="margin-top: 1rem;">
+                        <h3>🔧 Setup Required</h3>
+                        <p><strong>This is a deployment template.</strong> To enable full search functionality:</p>
+                        <ol style="margin: 1rem 0; padding-left: 2rem;">
+                            <li>Download ESC Guidelines PDFs from the official ESC website</li>
+                            <li>Process the data using the provided scripts in the repository</li>
+                            <li>Or visit a fully configured demo instance</li>
+                        </ol>
+                        <p><strong>Repository:</strong> <a href="https://github.com/jdverbek/esc-guidelines-search" target="_blank">https://github.com/jdverbek/esc-guidelines-search</a></p>
+                    </div>
+                `;
+            }
+            
+            resultsContent.innerHTML = errorHtml;
             hideLoading();
         }
         
@@ -217,7 +234,8 @@ HTML_TEMPLATE = """
                 const data = await response.json();
                 
                 if (data.error) {
-                    throw new Error(data.error);
+                    showError(data.error, data);
+                    return;
                 }
                 
                 resultsContent.innerHTML = formatResults(data);
@@ -293,9 +311,16 @@ def search():
     """Main search endpoint"""
     if not search_system:
         return jsonify({
-            'error': 'Search system not initialized. Please run the setup process to download and process ESC Guidelines.',
-            'setup_required': True
-        }), 503
+            'error': 'ESC Guidelines data not available. This deployment requires manual setup of the medical guidelines data.',
+            'setup_required': True,
+            'instructions': [
+                '1. Download ESC Guidelines PDFs from https://www.escardio.org/Guidelines/Clinical-Practice-Guidelines',
+                '2. Process the data using the provided scripts',
+                '3. For a fully functional demo, visit the original deployment'
+            ],
+            'demo_available': True,
+            'demo_message': 'This is a deployment template. The search functionality requires ESC Guidelines data to be processed.'
+        }), 200  # Changed to 200 to avoid browser errors
     
     try:
         data = request.get_json()
@@ -322,9 +347,16 @@ def clinical_search():
     """Clinical question search endpoint"""
     if not search_system:
         return jsonify({
-            'error': 'Search system not initialized. Please run the setup process to download and process ESC Guidelines.',
-            'setup_required': True
-        }), 503
+            'error': 'ESC Guidelines data not available. This deployment requires manual setup of the medical guidelines data.',
+            'setup_required': True,
+            'instructions': [
+                '1. Download ESC Guidelines PDFs from https://www.escardio.org/Guidelines/Clinical-Practice-Guidelines',
+                '2. Process the data using the provided scripts',
+                '3. For a fully functional demo, visit the original deployment'
+            ],
+            'demo_available': True,
+            'demo_message': 'This is a deployment template. The clinical search functionality requires ESC Guidelines data to be processed.'
+        }), 200  # Changed to 200 to avoid browser errors
     
     try:
         data = request.get_json()
