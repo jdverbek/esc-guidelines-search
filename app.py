@@ -307,6 +307,7 @@ def initialize_search_system():
         from advanced_search_system import AdvancedESCSearch
         
         logger.info("🔧 Creating search system instance...")
+        # Assign to the global variable
         search_system = AdvancedESCSearch()
         
         logger.info("✅ Search system initialized successfully!")
